@@ -2,8 +2,8 @@ import re, html, json
 from xml.etree.ElementTree import Element, tostring
 from bs4 import BeautifulSoup
 
-CHAR_WIDTH_PX = 15.65
-CHAR_HEIGHT_PX = 31
+CHAR_WIDTH_PX = 19.2667
+CHAR_HEIGHT_PX = 38
 
 class JSONTreeLoader(object):
     def __init__(self, json_filename):
@@ -118,6 +118,10 @@ def to_str(tree, show_internal=True, compact=False, props=None,
         py = py if py is not None else (0 if compact else 1)
 
         lines, _ = ascii_art(tree, show_internal, props, px, py, px0, py0, sharp_corners, render_html, waterfall)
+        # TODO styling relies on this - connect to a logical variable, maybe py0??
+        lines.insert(0,'')
+        lines.insert(1,'')
+        lines.insert(2,'')
         lines = '\n'.join(lines)
         if render_html:
             lines = f'<span aria-hidden="true">{lines}</span>'
@@ -156,15 +160,15 @@ def ascii_art(tree, show_internal=True, props=None, px=0, py=0, px0=0, py0=0, sh
     else:
         tag = descr
 
-    if tree.get_prop('px',''):
+    if type(tree.get_prop('px','')) is int:
         px = tree.get_prop('px','')
-    if tree.get_prop('py',''):
+    if type(tree.get_prop('py','')) is int:
         py = tree.get_prop('py','')
-    if tree.get_prop('px0',''):
+    if type(tree.get_prop('px0','')) is int:
         px0 = tree.get_prop('px0','')
-    if tree.get_prop('py0',''):
+    if type(tree.get_prop('py0','')) is int:
         py0 = tree.get_prop('py0','')
-    if tree.get_prop('cpy0',''):
+    if type(tree.get_prop('cpy0','')) is int:
         cpy0 = tree.get_prop('cpy0','')
     else:
         cpy0 = 0
@@ -174,11 +178,11 @@ def ascii_art(tree, show_internal=True, props=None, px=0, py=0, px0=0, py0=0, sh
     if tree.is_leaf:
         if render_html:
             tag = wrap_tag(tag)
-            if '<img' in tag:
-                return (['─' * px0 + tag], 0)
+            if 'node-container' in tag:
+                if tree.get_prop('type','') == 'textbox':
+                    return (['─' * px0 + '╴' + tag], 0)
+                return (['─' * (px0 + 1) + tag], 0)
         return (['─' * px0 + '╴' + tag], 0)
-    
-    
 
     lines = []
 
@@ -221,12 +225,18 @@ def ascii_art(tree, show_internal=True, props=None, px=0, py=0, px0=0, py0=0, sh
 
 def get_descr(tree, props, render_html=False):
     if render_html:
-        if tree.get_prop('type', '') == 'img':
-            char_width = tree.get_prop('char_width','')
+        if tree.get_prop('type', '') in ['img', 'vimeo']:
+            char_width = tree.get_prop('char_width',0)
+            if tree.get_prop('type','') == 'vimeo':
+                width = tree.get_prop('width','')
+                char_width = round(int(width) / CHAR_WIDTH_PX)
             if tree.is_leaf:
-                return '─' * (char_width // 2)
+                return '─' * ((char_width) // 2)
             else:
-                return '─' * char_width
+                return '─' * (char_width)
+        if tree.get_prop('type', '') == 'textbox':
+            char_width = tree.get_prop('char_width',0)
+            return '&nbsp;' * (char_width)
         return str(tree.get_prop('name', '')) # only render name
     else:
         return ','.join(
@@ -238,57 +248,112 @@ def get_tag(tree, props, descr):
     aria_owns = tree.get_child_ids()
     if tree.get_prop('type','') == 'link':
         href = tree.get_prop('href','')
+        target = tree.get_prop('target','')
         tag = Element('a', attrib={
             'id': id,
             'aria-owns': aria_owns,
+            'aria-label': descr,
             'href': href,
+            'target': target,
             'tabindex': '0',
         })
         tag.text = descr
+    elif tree.get_prop('type','') == 'vimeo':
+        tag = Element('div', attrib={
+            'id': id,
+            'aria-owns': aria_owns,
+            'class':'node-container',
+        })
+        outer = Element('div')
+        inner = Element('div', attrib={
+            'class':'node-content'
+        })
+
+        src = tree.get_prop('src','')
+        name = tree.get_prop('name','')
+        width = tree.get_prop('width', 334) # 384
+        height = tree.get_prop('height', 188) # 216
+        iframe_player = Element('iframe', attrib={
+            'src': src,
+            'title': name,
+            'alt': name,
+            'width': str(width),
+            'height': str(height),
+            'frameborder': '0',
+            'allow': 'picture-in-picture; clipboard-write;'
+        })
+
+        inner.append(iframe_player)
+        outer.append(inner)
+        tag.append(outer)
     elif tree.get_prop('type','') == 'img':
         tag = Element('div', attrib={
             'id':id,
             'aria-owns': aria_owns,
-            'class':'img-container',
+            'class':'node-container',
         })
 
-        href = tree.get_prop('href','')
-        link = Element('a', attrib={
-            'href': href,
-            'tabindex': '0',
-        })
+        outer = None
+        if tree.get_prop('href',''):
+            href = tree.get_prop('href','')
+            target = tree.get_prop('target','')
+            outer = Element('a', attrib={
+                'href': href,
+                'tabindex': '0',
+                'target': target
+            })
+        else:
+            outer = Element('div')
 
         src = tree.get_prop('src','')
         name = tree.get_prop('name','')
         char_width = tree.get_prop('char_width','')
         img = Element('img', attrib={
-            'class': 'img-content',
+            'class': 'node-content',
             'alt': name,
             'src': src,
-            'width': str(char_width * CHAR_WIDTH_PX),
+            'style': f'width:{str(char_width * CHAR_WIDTH_PX)}px;',
         })
 
-        link.append(img)
-        tag.append(link)
+        outer.append(img)
+        tag.append(outer)
+    elif tree.get_prop('type','') == 'textbox':
+        char_width = tree.get_prop('char_width','')
+
+        tag = Element('div', attrib={
+            'id':id,
+            'aria-owns': aria_owns,
+            'class':'node-container',
+        })
+        outer_div = Element('div')
+
+        inner_div = Element('div', attrib={
+            'class':'node-content'
+        })
+
+        text = tree.get_prop('text','')
+        inner_div.text = text
+        outer_div.append(inner_div)
+        tag.append(outer_div)
     else:
         tag = Element('span', attrib={
             'id': id,
-            'aria-owns': aria_owns
+            'aria-owns': aria_owns,
+            'style': 'font-weight:bold;'
         })
         tag.text = descr
-    if tree.get_prop('type','') == 'img':
-        char_width = tree.get_prop('char_width','')
-        if tree.is_leaf:
-            dashes = '─' * ((char_width + 2) // 2) # + 2 accounts for margins
-        else:
-            dashes = '─' * (char_width + 2) # + 2 accounts for margins
-        return tostring(tag, encoding='unicode', method='html') + wrap_tag(dashes, False) # temp
+    if tree.get_prop('type','') in ['img', 'vimeo']:
+        return tostring(tag, encoding='unicode', method='html') + wrap_tag(descr, False)
+    if tree.get_prop('type','') in ['textbox']:
+        return tostring(tag, encoding='unicode', method='html') + wrap_tag(descr, False, True)
     else:
         return tostring(tag, encoding='unicode', method='html')
 
-def wrap_tag(tag, reverse=True):
+def wrap_tag(tag, reverse=True, textbox=False):
     if reverse:
         return f'</span>{tag}<span aria-hidden="true">'
+    if textbox:
+        return f'<span class="textbox" aria-hidden="true">{tag}</span>'
     return f'<span aria-hidden="true">{tag}</span>'
 
 def add_prefix(lines, px, mid, c1, c2, c3):
@@ -318,7 +383,7 @@ def add_base(line, px, px0, descr, txt, show_internal, render_html=False):
     if render_html:
         txt = wrap_tag(txt)
 
-    if '<img' in txt:
+    if 'node-container' in txt:
         prefix_txt = '─' * px0 + f'{txt}'
     else:
         prefix_txt = '─' * px0 + (f'╴{txt}╶' if txt else '──')
@@ -374,7 +439,7 @@ def get_branches_repr(are_last, is_leaf, px, sharp_corners):
                      for is_last in are_last[:-1])
 
     return (prefix   + (('└' if sharp_corners else '╰') if are_last[-1] else '├') +
-            '─' * px + ('╴' if is_leaf      else '┐'))
+            '─' * px + ('╴' if is_leaf        else '┐'))
 
 def insert_text_into_html(filename, css_selector, markup):
     temp_soup = BeautifulSoup(markup, 'html.parser')
