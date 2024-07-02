@@ -49,6 +49,8 @@ for in_filename in glob('html/**/*.json', recursive=True):
         result = insert_text_into_html(out_filename, css_selector, markup)
         if result == 'Success':
             print(f'Done. Successfully converted {in_filename} to {out_filename}.')
+        elif result == 'Output file not found':
+            print(f'Output file not found. Skipping {in_filename}.')
         elif result == 'Selector not found':
             print(f'Selector not found. Skipping {in_filename}.')
 
