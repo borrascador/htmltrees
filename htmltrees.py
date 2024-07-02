@@ -448,7 +448,11 @@ def insert_text_into_html(filename, css_selector, markup):
     with open(filename, "r") as src_file:
         soup = BeautifulSoup(src_file, 'html.parser')
         old_tag = soup.select_one(css_selector)
-        old_tag.replace_with(new_tag)
+        if old_tag:
+            old_tag.replace_with(new_tag)
+        else:
+            return 'Selector not found'
 
     with open(filename, "w") as dest_file:
         dest_file.write(html.unescape(str(soup)))
+        return 'Success'

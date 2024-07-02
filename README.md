@@ -46,8 +46,11 @@ for in_filename in glob('html/**/*.json', recursive=True):
 
         css_selector = 'div[id="tree-target"]'
         markup = f'<div class="ascii-art pre-like" id="tree-target">{output_string}</div>'
-        insert_text_into_html(out_filename, css_selector, markup)
-        print('Done.')
+        result = insert_text_into_html(out_filename, css_selector, markup)
+        if result == 'Success':
+            print(f'Done. Successfully converted {in_filename} to {out_filename}.')
+        elif result == 'Selector not found':
+            print(f'Selector not found. Skipping {in_filename}.')
 
 print(f'Successfully converted {filecount} files from json to html.')
 ```
