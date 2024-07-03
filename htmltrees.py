@@ -66,7 +66,7 @@ class Tree(object):
         return attr if attr is not None else self.props.get(prop, default)
 
     def to_str(self, show_internal=True, compact=False, props=None,
-               px=None, py=None, px0=0, py0=0, sharp_corners=False, render_html=False, cascade=False, waterfall=False):
+               px=None, py=None, px0=0, py0=0, blank_start=0, sharp_corners=False, render_html=False, cascade=False, waterfall=False):
         """Return a string containing an ascii drawing of the tree.
 
         :param show_internal: If True, show the internal nodes too.
@@ -80,7 +80,7 @@ class Tree(object):
         :param waterfall: Use a waterfall representation.
         """
         return to_str(self, show_internal, compact, props,
-                               px, py, px0, py0, sharp_corners, render_html, cascade, waterfall)
+                               px, py, px0, py0, blank_start, sharp_corners, render_html, cascade, waterfall)
 
 """
 Tree text visualization.
@@ -96,7 +96,7 @@ a console or to HTML.
 #   t.to_str(...)
 
 def to_str(tree, show_internal=True, compact=False, props=None,
-           px=None, py=0, px0=0, py0=0, sharp_corners=False, render_html=False, cascade=False, waterfall=False):
+           px=None, py=0, px0=0, py0=0, blank_start=0, sharp_corners=False, render_html=False, cascade=False, waterfall=False):
     """Return a string containing an ascii drawing of the tree.
 
     :param show_internal: If True, show the internal nodes too.
@@ -118,10 +118,12 @@ def to_str(tree, show_internal=True, compact=False, props=None,
         py = py if py is not None else (0 if compact else 1)
 
         lines, _ = ascii_art(tree, show_internal, props, px, py, px0, py0, sharp_corners, render_html, waterfall)
-        # TODO styling relies on this - connect to a logical variable, maybe py0??
-        lines.insert(0,'')
-        lines.insert(1,'')
-        lines.insert(2,'')
+        
+        # Add empty lines at start
+        if type(blank_start) is int:
+            for index in range(blank_start):
+                lines.insert(index,'')
+
         lines = '\n'.join(lines)
         if render_html:
             lines = f'<span aria-hidden="true">{lines}</span>'
@@ -249,6 +251,7 @@ def get_tag(tree, props, descr):
     if tree.get_prop('type','') == 'link':
         href = tree.get_prop('href','')
         target = tree.get_prop('target','')
+        weight = tree.get_prop('weight','regular')
         tag = Element('a', attrib={
             'id': id,
             'aria-owns': aria_owns,
@@ -256,6 +259,7 @@ def get_tag(tree, props, descr):
             'href': href,
             'target': target,
             'tabindex': '0',
+            'style': f'font-weight:{weight};'
         })
         tag.text = descr
     elif tree.get_prop('type','') == 'vimeo':
@@ -336,10 +340,11 @@ def get_tag(tree, props, descr):
         outer_div.append(inner_div)
         tag.append(outer_div)
     else:
+        weight = tree.get_prop('weight','regular')
         tag = Element('span', attrib={
             'id': id,
             'aria-owns': aria_owns,
-            'style': 'font-weight:bold;'
+            'style': f'font-weight:{weight};'
         })
         tag.text = descr
     if tree.get_prop('type','') in ['img', 'vimeo']:
